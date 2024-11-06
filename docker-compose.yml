@@ -1,0 +1,17 @@
+version: "2.1"
+services:
+  plex-recommendations:
+    image: eldarborge/plex-ai:latest
+    container_name: plex-ai
+    environment:
+      - PLEX_URL=<local plex url>
+      - PLEX_TOKEN=<plex token>
+      - OPENAI_KEY=<open ai key>
+      - TV_LIBRARY_NAMES=<comma seperated library name>
+      - MOVIE_LIBRARY_NAMES=<comma seperated library name>
+      - COLLECTION_TITLE=<title>
+      - HISTORY_AMOUNT=<amount>
+      - RECOMMENDED_AMOUNT=<amount>
+      - MINIMUM_AMOUNT=<amount>
+      - SECONDS_TO_WAIT=<amount>
+    restart: unless-stopped
