@@ -28,12 +28,13 @@ def create_collection(plex, movie_items, description, library):
     logging.info("Finding matching movies in your library...")
     movie_list = []
     for item in movie_items:
-        movie_search = plex.search(item, mediatype="movie", limit=3)
+        cleaned_item = re.sub(r"[^a-zA-Z0-9\s]", "", item).strip()
+        movie_search = plex.search(cleaned_item, mediatype="movie", limit=3)
         if len(movie_search) > 0:
             movie_list.append(movie_search[0])
-            logging.info(item + " - found")
+            logging.info(f"{cleaned_item} - found")
         else:
-            logging.info(item + " - not found")
+            logging.info(f"{cleaned_item} - not found")
 
     if len(movie_list) > userInputs.minimum_amount:
         try:
@@ -45,7 +46,7 @@ def create_collection(plex, movie_items, description, library):
         except:
             collection = plex.createCollection(
                 title=userInputs.collection_title,
-                section=userInputs.library_name,
+                section=library.title,
                 items=movie_list
             )
             collection.editSummary(description)
@@ -64,48 +65,49 @@ def run():
             logging.error("Plex Authorization error")
             return
 
-        try:
-            # Find history items for the library
-            library = plex.library.section(userInputs.library_name)
-            account_id = plex.systemAccounts()[1].accountID
+         for library_name in userInputs.library_names:
+            try:
+                # Fetch watch history from Plex
+                library = plex.library.section(library_name.strip())
+                account_id = plex.systemAccounts()[1].accountID
 
-            # a = library.hubs()
+                # a = library.hubs()
 
-            items_string = ""
-            history_items_titles = []
-            watch_history_items = plex.history(librarySectionID=library.key, maxresults=userInputs.history_amount, accountID=account_id)
-            logging.info("Fetching items from your watch history")
+                items_string = ""
+                history_items_titles = []
+                watch_history_items = plex.history(librarySectionID=library.key, maxresults=userInputs.history_amount, accountID=account_id)
+                logging.info(f"Fetching items from your watch history in library {library_name.strip()}")
 
-            for history_item in watch_history_items:
-                history_items_titles.append(history_item.title)
+                for history_item in watch_history_items:
+                    history_items_titles.append(history_item.title)
 
-            items_string = ", ".join(history_items_titles)
-            logging.info("Found " + items_string + " to base recommendations off")
+                items_string = ", ".join(history_items_titles)
+                logging.info(f"Found {items_string} to base recommendations off")
 
-        except Exception as e:
-            logging.error("Failed to get watched items")
-            return
+            except Exception as e:
+                logging.error(f"Failed to get watched items for library {library_name.strip()}")
+                continue
 
-        try:
-            query = "Can you give me movie recommendations based on what I've watched? "
-            query += "I've watched " + items_string + ". "
-            query += "Can you base your recommendations solely on what I've watched already. "
-            query += "I need around " + str(userInputs.recommended_amount) + ". "
-            query += "Please give me the comma separated list, not a numbered list."
+            try:
+                query = "Can you give me movie recommendations based on what I've watched? "
+                query += "I've watched " + items_string + ". "
+                query += "Can you base your recommendations solely on what I've watched already. "
+                query += "I need around " + str(userInputs.recommended_amount) + ". "
+                query += "Please give me the comma separated list, not a numbered list."
 
-            logging.info("Querying openai for recommendations...")
-            chat_completion = openai.ChatCompletion.create(model=openai_model, messages=[{"role": "user", "content": query}])
-            movie_items = list(filter(None, chat_completion.choices[0].message.content.split(",")))
-            logging.info("Query success!")
-        except:
-            logging.error('Was unable to query openai')
-            return
+                logging.info("Querying openai for recommendations...")
+                chat_completion = openai.ChatCompletion.create(model=openai_model, messages=[{"role": "user", "content": query}])
+                movie_items = list(filter(None, chat_completion.choices[0].message.content.split(",")))
+                logging.info("Query success!")
+            except Exception as e:
+                logging.error(f'Was unable to query openai: {e}')
+                return
 
-        if len(movie_items) > 0:
-            create_collection(plex, movie_items, ai_movie_description, library)
+            if len(movie_items) > 0:
+                create_collection(plex, movie_items, ai_movie_description, library)
 
-        logging.info("Waiting on next call...")
-        time.sleep(userInputs.wait_seconds)
+            logging.info("Waiting on next call...")
+            time.sleep(userInputs.wait_seconds)
 
 if __name__ == '__main__':
     run()

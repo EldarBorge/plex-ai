@@ -1,11 +1,12 @@
 from dataclasses import dataclass
+from typing import List
 
 @dataclass
 class UserInputs:
     plex_url: str
     plex_token: str
     openai_key: str
-    library_name: str
+    library_names: List[str]
     collection_title: str
     history_amount: int
     recommended_amount: int
